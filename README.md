@@ -44,40 +44,77 @@ docker build -t rfdiffusion:latest .
 
 ## Usage
 
-### Interactive Shell
+### Run RFdiffusion Inference (Simple)
 
-```bash
-docker run --gpus all -it ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest
-```
-
-### Run RFdiffusion Inference
+The image is configured with an entrypoint that automatically activates the conda environment:
 
 ```bash
 docker run --gpus all -v $(pwd)/output:/output \
   ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest \
-  conda run --no-capture-output -n SE3nv python /app/RFdiffusion/scripts/run_inference.py \
+  python scripts/run_inference.py \
   --config-name=base \
   inference.output_prefix=/output/test \
   inference.num_designs=1
 ```
 
+### Run with Symmetry Config
+
+```bash
+docker run --gpus all -v $(pwd)/output:/output \
+  ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest \
+  python scripts/run_inference.py \
+  --config-name=symmetry \
+  inference.symmetry="C6" \
+  inference.num_designs=1 \
+  inference.output_prefix=/output/C6_oligo \
+  'contigmap.contigs=[480-480]'
+```
+
+### Interactive Shell
+
+```bash
+docker run --gpus all -it --entrypoint /bin/bash \
+  ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest
+```
+
 ### Use in Nextflow
 
 ```groovy
-process RFDIFFUSION {
+process RFDIFFUSION_INFERENCE {
     container 'ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest'
 
     input:
-    // your inputs
+    tuple val(meta), path(model_path)
+
+    output:
+    tuple val(meta), path("*.pdb"), emit: structures
 
     script:
     """
-    python /app/RFdiffusion/scripts/run_inference.py \\
-      --config-name=base \\
-      inference.output_prefix=output \\
-      inference.num_designs=1
+    python scripts/run_inference.py \\
+      --config-name=symmetry \\
+      inference.model_directory_path=/app/RFdiffusion/models \\
+      inference.symmetry="C6" \\
+      inference.num_designs=1 \\
+      inference.output_prefix="${meta.id}" \\
+      'contigmap.contigs=[480-480]' \\
+      inference.ckpt_override_path=${model_path}
     """
 }
+```
+
+### Use with Apptainer/Singularity
+
+```bash
+# Pull image
+apptainer pull rfdiffusion.sif docker://ghcr.io/YOUR_USERNAME/rfdiffusion-docker-cuda12.4:latest
+
+# Run inference
+apptainer run --nv rfdiffusion.sif \
+  python scripts/run_inference.py \
+  --config-name=base \
+  inference.output_prefix=output/test \
+  inference.num_designs=1
 ```
 
 ## Environment Details
