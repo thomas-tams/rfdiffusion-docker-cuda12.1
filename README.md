@@ -30,18 +30,32 @@ Optimized Docker image for RFdiffusion with NVIDIA CUDA 12.1 support, pre-config
 
 ## Installation
 
+### Pull Pre-built Image
+
+#### Using Docker
+
+```bash
+docker pull ghcr.io/thomas-tams/rfdiffusion-docker-cuda12.1:latest
+```
+
+#### Using Apptainer/Singularity
+
+```bash
+apptainer pull docker://ghcr.io/thomas-tams/rfdiffusion-docker-cuda12.1:latest
+```
+
 ### Build Locally
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/rfdiffusion-docker-cuda12.1.git
+git clone https://github.com/thomas-tams/rfdiffusion-docker-cuda12.1.git
 cd rfdiffusion-docker-cuda12.1
-docker build -f Dockerfile.new -t rfdiffusion-optimized .
+docker build -t rfdiffusion-optimized .
 ```
 
 ### Test CUDA Availability
 
 ```bash
-docker run --rm --gpus all rfdiffusion-optimized python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+docker run --rm --gpus all ghcr.io/thomas-tams/rfdiffusion-docker-cuda12.1:latest python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 ```
 
 ## Usage
@@ -130,7 +144,10 @@ process RFDIFFUSION_INFERENCE {
 ### Use with Apptainer/Singularity
 
 ```bash
-# Build from Docker image
+# Pull pre-built image
+apptainer pull rfdiffusion.sif docker://ghcr.io/thomas-tams/rfdiffusion-docker-cuda12.1:latest
+
+# Or build from local Docker image
 apptainer build rfdiffusion.sif docker-daemon://rfdiffusion-optimized:latest
 
 # Run inference
