@@ -1,59 +1,47 @@
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
 # Set working directory
 WORKDIR /app
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV CONDA_DIR=/opt/conda
-ENV PATH=$CONDA_DIR/bin:$PATH
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     wget \
-    build-essential \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Miniconda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
-    /bin/bash /tmp/miniconda.sh -b -p $CONDA_DIR && \
-    rm /tmp/miniconda.sh && \
-    conda clean -afy
-
-# Copy environment file from GitHub repo context
-COPY environment.yml /tmp/environment.yml
-
-# Accept Conda Terms of Service and create conda environment
-RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
-    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
-    conda env create -f /tmp/environment.yml && \
-    conda clean -afy
-
-# Make RUN commands use the conda environment
-SHELL ["conda", "run", "-n", "SE3nv", "/bin/bash", "-c"]
-
-# Install PyTorch with CUDA 12.1 support via pip (better compatibility with driver 550)
-RUN pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu121
+# Install Python dependencies from environment.yml
+RUN pip install --no-cache-dir \
+    hydra-core==1.3.2 \
+    pyrsistent==0.20.0 \
+    e3nn==0.3.3 \
+    wandb==0.12.0 \
+    pynvml==11.0.0 \
+    decorator==5.1.0 \
+    opt-einsum==3.4.0 \
+    opt-einsum-fx==0.1.4 \
+    scipy==1.13.1 \
+    pandas>=2.0.0 \
+    pydantic>=2.0.0 \
+    git+https://github.com/NVIDIA/dllogger#egg=dllogger
 
 # Install DGL with CUDA 12.1 support matching PyTorch 2.3
-RUN pip install dgl -f https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html
+RUN pip install --no-cache-dir dgl -f https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html
 
 # Clone RFdiffusion repository
 RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/RFdiffusion && \
     cd /app/RFdiffusion && \
     git checkout e22092420281c644b928e64d490044dfca4f9175
 
-# Install SE3Transformer
+# Install SE3Transformer (using python setup.py install to match original)
 RUN cd /app/RFdiffusion/env/SE3Transformer && \
     python setup.py install
 
 # Install RFdiffusion
 RUN cd /app/RFdiffusion && \
-    pip install -e .
+    pip install --no-cache-dir -e .
 
 # Create models directory
 RUN mkdir -p /app/RFdiffusion/models
@@ -70,15 +58,8 @@ RUN cd /app/RFdiffusion/models && \
     echo "Downloaded models:" && \
     ls -lh /app/RFdiffusion/models/*.pt
 
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # Set working directory to RFdiffusion
 WORKDIR /app/RFdiffusion
-
-# Set entrypoint to activate conda environment
-ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command runs Python with run_inference.py
 CMD ["python", "/app/RFdiffusion/scripts/run_inference.py"]
